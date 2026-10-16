@@ -49,9 +49,22 @@ public struct AppConfig: Codable, Hashable, Sendable {
         subscriptions: [],
         providers: [
             ProviderSettings(id: "openai", displayName: "OpenAI"),
-            ProviderSettings(id: "anthropic", displayName: "Anthropic")
+            ProviderSettings(id: "anthropic", displayName: "Anthropic"),
+            ProviderSettings(id: "zai", displayName: "Z.ai GLM")
         ],
         notifyDaysBeforeRenewal: 3,
         refreshIntervalMinutes: 15
     )
+}
+
+extension AppConfig {
+    /// Adds default providers missing from configs saved by older versions.
+    public func mergingMissingDefaultProviders() -> AppConfig {
+        var updated = self
+        for provider in AppConfig.default.providers
+        where !updated.providers.contains(where: { $0.id == provider.id }) {
+            updated.providers.append(provider)
+        }
+        return updated
+    }
 }

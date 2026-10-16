@@ -31,12 +31,20 @@ public struct ProviderSpendSnapshot: Codable, Hashable, Sendable {
     public let fetchedAt: Date
     /// Non-nil when the last fetch failed; monthToDateUSD is then meaningless.
     public let error: String?
+    /// GLM Coding Plan style quota (percentage used), when the provider
+    /// exposes quota instead of monetary spend.
+    public let quotaUsedPercent: Double?
+    public let quotaResetAt: Date?
 
-    public init(providerID: String, monthToDateUSD: Double, fetchedAt: Date, error: String?) {
+    public init(providerID: String, monthToDateUSD: Double, fetchedAt: Date,
+                error: String?, quotaUsedPercent: Double? = nil,
+                quotaResetAt: Date? = nil) {
         self.providerID = providerID
         self.monthToDateUSD = monthToDateUSD
         self.fetchedAt = fetchedAt
         self.error = error
+        self.quotaUsedPercent = quotaUsedPercent
+        self.quotaResetAt = quotaResetAt
     }
 }
 
@@ -223,6 +231,94 @@ public struct AnthropicCostClient: CostFetching {
         } while page != nil && pages < 5
 
         return total
+    }
+}
+
+// MARK: - Z.ai (GLM Coding Plan)
+
+public struct ZaiPlanQuota: Hashable, Sendable {
+    public let usedPercent: Double
+    public let remaining: Double?
+    public let resetAt: Date?
+
+    public init(usedPercent: Double, remaining: Double?, resetAt: Date?) {
+        self.usedPercent = usedPercent
+        self.remaining = remaining
+        self.resetAt = resetAt
+    }
+}
+
+public enum ZaiQuotaParser {
+    struct QuotaResponse: Decodable {
+        let data: QuotaData?
+
+        struct QuotaData: Decodable {
+            let limits: [Limit]?
+        }
+
+        struct Limit: Decodable {
+            let type: String?
+            let percentage: Double?
+            let usage: Double?
+            let currentValue: Double?
+            let remaining: Double?
+            let nextResetTime: Double?
+        }
+    }
+
+    /// Parses the undocumented-but-stable Coding Plan quota endpoint used by
+    /// the z.ai subscription UI (`/api/monitor/usage/quota/limit`).
+    public static func parse(from data: Data) throws -> ZaiPlanQuota {
+        let response = try JSONDecoder().decode(QuotaResponse.self, from: data)
+        guard let limit = response.data?.limits?.first(where: { ($0.type ?? "").contains("LIMIT") })
+        else {
+            throw CostClientError.http(status: 0,
+                                       body: "No quota limit entry in response")
+        }
+
+        let usedPercent: Double
+        if let percentage = limit.percentage {
+            usedPercent = percentage
+        } else if let used = limit.currentValue, let total = limit.usage, total > 0 {
+            usedPercent = used / total * 100
+        } else {
+            usedPercent = 0
+        }
+
+        let resetAt: Date?
+        if let milliseconds = limit.nextResetTime {
+            resetAt = Date(timeIntervalSince1970: milliseconds / 1000)
+        } else {
+            resetAt = nil
+        }
+
+        return ZaiPlanQuota(usedPercent: usedPercent,
+                            remaining: limit.remaining,
+                            resetAt: resetAt)
+    }
+}
+
+public protocol QuotaFetching: Sendable {
+    func planQuota(now: Date) async throws -> ZaiPlanQuota
+}
+
+/// Queries the GLM Coding Plan quota (works with a z.ai API key).
+public struct ZaiQuotaClient: QuotaFetching {
+    static let baseURL = URL(string: "https://api.z.ai/api/monitor/usage/quota/limit")!
+    public let apiKey: String
+
+    public init(apiKey: String) {
+        self.apiKey = apiKey
+    }
+
+    public func planQuota(now: Date) async throws -> ZaiPlanQuota {
+        var request = URLRequest(url: Self.baseURL)
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try OpenAICostClient.assertOK(response, data: data)
+        return try ZaiQuotaParser.parse(from: data)
     }
 }
 

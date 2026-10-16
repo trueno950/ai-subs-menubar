@@ -21,7 +21,7 @@ final class AppState: ObservableObject {
 
     init(store: ConfigStore = AppState.makeDefaultStore()) {
         self.store = store
-        self.config = (try? store.load()) ?? .default
+        self.config = ((try? store.load()) ?? .default).mergingMissingDefaultProviders()
     }
 
     private func persist() {
@@ -61,6 +61,21 @@ final class AppState: ObservableObject {
                 spend[provider.id] = ProviderSpendSnapshot(
                     providerID: provider.id, monthToDateUSD: 0, fetchedAt: Date(),
                     error: "No API key configured")
+                continue
+            }
+
+            if provider.id == "zai" {
+                do {
+                    let quota = try await ZaiQuotaClient(apiKey: key).planQuota(now: Date())
+                    spend[provider.id] = ProviderSpendSnapshot(
+                        providerID: provider.id, monthToDateUSD: 0, fetchedAt: Date(),
+                        error: nil, quotaUsedPercent: quota.usedPercent,
+                        quotaResetAt: quota.resetAt)
+                } catch {
+                    spend[provider.id] = ProviderSpendSnapshot(
+                        providerID: provider.id, monthToDateUSD: 0, fetchedAt: Date(),
+                        error: error.localizedDescription)
+                }
                 continue
             }
 

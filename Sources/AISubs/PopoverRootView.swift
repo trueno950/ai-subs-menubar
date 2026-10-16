@@ -134,7 +134,7 @@ struct APIProviderRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: provider.id == "openai" ? "burst.fill" : "paintbrush.pointed.fill")
+            Image(systemName: provider.id == "openai" ? "burst.fill" : (provider.id == "zai" ? "cpu" : "paintbrush.pointed.fill"))
                 .foregroundStyle(.secondary)
                 .frame(width: 22)
             VStack(alignment: .leading, spacing: 1) {
@@ -143,7 +143,11 @@ struct APIProviderRow: View {
                 caption
             }
             Spacer()
-            if let snapshot = appState.spend[provider.id], snapshot.error == nil {
+            if let percent = appState.spend[provider.id]?.quotaUsedPercent {
+                Text("\(Int(percent))%")
+                    .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
+                    .foregroundStyle(percent >= 90 ? Color.red : Color.primary)
+            } else if let snapshot = appState.spend[provider.id], snapshot.error == nil {
                 Text(snapshot.monthToDateUSD, format: .currency(code: "USD"))
                     .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
             } else if appState.spend[provider.id]?.error != nil {
@@ -164,7 +168,15 @@ struct APIProviderRow: View {
 
     @ViewBuilder
     private var caption: some View {
-        if let snapshot = appState.spend[provider.id], let error = snapshot.error {
+        if let reset = appState.spend[provider.id]?.quotaResetAt {
+            Text("resets \(reset.formatted(date: .abbreviated, time: .omitted)) · \(Int(appState.spend[provider.id]?.quotaUsedPercent ?? 0))% used")
+                .font(.caption2.monospacedDigit())
+                .foregroundStyle(.secondary)
+        } else if provider.id == "zai", let snapshot = appState.spend[provider.id], snapshot.error == nil {
+            Text("plan quota")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        } else if let snapshot = appState.spend[provider.id], let error = snapshot.error {
             Text(error)
                 .font(.caption2)
                 .foregroundStyle(.orange)

@@ -234,8 +234,8 @@ struct APIKeysTab: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Text("Create an Admin API key on each provider dashboard. " +
-                     "Keys are stored only in your login Keychain.")
+                Text("Admin API keys for OpenAI/Anthropic; a standard z.ai API key works " +
+                     "for the GLM Coding Plan quota. Keys are stored only in your login Keychain.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)

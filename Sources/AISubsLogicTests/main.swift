@@ -185,6 +185,47 @@ do {
     check(detector.shouldFire(nowAlerting: true), "fires again on a new crossing")
 }
 
+// MARK: - ZaiQuotaParser (GLM Coding Plan quota)
+
+do {
+    let sample = """
+    {"code":200,"data":{"limits":[
+      {"type":"CREDIT_LIMIT","unit":3,"number":5,"usage":800000000,"currentValue":127694464,"remaining":672305536,"percentage":15,"nextResetTime":1770648402389}
+    ]}}
+    """
+    let quota = try ZaiQuotaParser.parse(from: Data(sample.utf8))
+    check(abs(quota.usedPercent - 15) < 0.001, "ZaiQuotaParser uses provided percentage (got \(quota.usedPercent))")
+    check(abs((quota.remaining ?? 0) - 672305536) < 0.001, "ZaiQuotaParser keeps remaining quota")
+    check(quota.resetAt != nil && abs(quota.resetAt!.timeIntervalSince1970 - 1770648402.389) < 0.01,
+          "ZaiQuotaParser converts epoch-milliseconds reset time")
+}
+do {
+    let sample = """
+    {"code":200,"data":{"limits":[
+      {"type":"SOMETHING_ELSE","percentage":99},
+      {"type":"TOKENS_LIMIT","number":1000,"usage":1000,"currentValue":800,"remaining":200}
+    ]}}
+    """
+    let quota = try ZaiQuotaParser.parse(from: Data(sample.utf8))
+    check(abs(quota.usedPercent - 80) < 0.001, "ZaiQuotaParser computes percent from usage when missing (got \(quota.usedPercent))")
+    check(quota.resetAt == nil, "ZaiQuotaParser tolerates missing reset time")
+}
+
+// MARK: - AppConfig provider migration
+
+do {
+    var legacy = AppConfig.default
+    legacy.providers.removeLast() // simulate a config saved before zai existed
+    let migrated = legacy.mergingMissingDefaultProviders()
+    check(migrated.providers.contains(where: { $0.id == "zai" }),
+          "migration adds zai provider to configs saved before it existed")
+    let custom = ProviderSettings(id: "custom-thing", displayName: "Custom")
+    var withCustom = AppConfig.default
+    withCustom.providers.append(custom)
+    check(withCustom.mergingMissingDefaultProviders().providers.contains(custom),
+          "migration preserves custom providers")
+}
+
 // MARK: - Summary
 
 print("")
