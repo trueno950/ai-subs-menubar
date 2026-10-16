@@ -66,9 +66,9 @@ checkEqual(RenewalMath.daysUntil(date(2026, 3, 15), from: date(2026, 3, 15), cal
 
 do {
     let subs = [
-        Subscription(name: "ChatGPT Plus", monthlyPriceUSD: 20, renewalDay: 12, symbol: "sparkles"),
-        Subscription(name: "Claude Pro", monthlyPriceUSD: 20, renewalDay: 28, symbol: "paintbrush"),
-        Subscription(name: "Cursor", monthlyPriceUSD: 9.99, renewalDay: 5, symbol: "cursorarrow")
+        AISubscription(name: "ChatGPT Plus", monthlyPriceUSD: 20, renewalDay: 12, symbol: "sparkles"),
+        AISubscription(name: "Claude Pro", monthlyPriceUSD: 20, renewalDay: 28, symbol: "paintbrush"),
+        AISubscription(name: "Cursor", monthlyPriceUSD: 9.99, renewalDay: 5, symbol: "cursorarrow")
     ]
     let totalPrice = RenewalMath.monthlyTotal(subs)
     check(abs(totalPrice - 49.99) < 0.001, "monthlyTotal sums all subscriptions (got \(totalPrice))")
@@ -95,7 +95,7 @@ check(!BalanceMath.shouldAlert(estimatedBalanceUSD: nil, monthToDateSpendUSD: 4,
 
 do {
     var config = AppConfig.default
-    config.subscriptions.append(Subscription(name: "Perplexity Pro", monthlyPriceUSD: 20, renewalDay: 7, symbol: "questionmark.circle"))
+    config.subscriptions.append(AISubscription(name: "Perplexity Pro", monthlyPriceUSD: 20, renewalDay: 7, symbol: "questionmark.circle"))
     let data = try JSONEncoder().encode(config)
     let decoded = try JSONDecoder().decode(AppConfig.self, from: data)
     checkEqual(decoded, config, "AppConfig survives JSON round-trip unchanged")
@@ -115,7 +115,7 @@ do {
     check(try store.load() == nil, "fresh store has no config yet")
 
     var config = AppConfig.default
-    config.subscriptions.append(Subscription(name: "Midjourney", monthlyPriceUSD: 30, renewalDay: 2, symbol: "wand.and.stars"))
+    config.subscriptions.append(AISubscription(name: "Midjourney", monthlyPriceUSD: 30, renewalDay: 2, symbol: "wand.and.stars"))
     try store.save(config)
 
     let loaded = try ConfigStore(directory: dir).load()

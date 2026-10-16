@@ -31,7 +31,7 @@ public enum RenewalMath {
     }
 
     /// Sum of all monthly prices in USD.
-    public static func monthlyTotal(_ subscriptions: [Subscription]) -> Double {
+    public static func monthlyTotal(_ subscriptions: [AISubscription]) -> Double {
         subscriptions.reduce(0) { $0 + $1.monthlyPriceUSD }
     }
 }

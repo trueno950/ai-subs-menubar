@@ -1,7 +1,7 @@
 import Foundation
 
 /// A manually tracked subscription (ChatGPT Plus, Claude Pro, Cursor, ...).
-public struct Subscription: Codable, Identifiable, Hashable, Sendable {
+public struct AISubscription: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var name: String
     public var monthlyPriceUSD: Double
@@ -40,7 +40,7 @@ public struct ProviderSettings: Codable, Hashable, Sendable {
 
 /// Root configuration persisted as JSON in Application Support.
 public struct AppConfig: Codable, Hashable, Sendable {
-    public var subscriptions: [Subscription]
+    public var subscriptions: [AISubscription]
     public var providers: [ProviderSettings]
     public var notifyDaysBeforeRenewal: Int
     public var refreshIntervalMinutes: Int
