@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 import AISubsCore
 
 @MainActor
@@ -8,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: StatusPanel?
     private let settingsController = SettingsWindowController()
     private lazy var appState = AppState()
+    private var refreshTimer: Timer?
+    private var configCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let panel = StatusPanel(content: PopoverRootView(
@@ -28,6 +31,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = item
 
         panel.placeBelowStatusBarItem(item)
+
+        Notifier.requestAuthorizationIfNeeded()
+        scheduleRenewals()
+        refreshAndDeliverAlerts()
+        startRefreshTimer()
+
+        configCancellable = appState.$config.sink { [weak self] _ in
+            self?.scheduleRenewals()
+            self?.startRefreshTimer()
+        }
+    }
+
+    private func scheduleRenewals() {
+        Notifier.scheduleRenewalNotifications(
+            subscriptions: appState.config.subscriptions,
+            daysBefore: appState.config.notifyDaysBeforeRenewal)
+    }
+
+    private func refreshAndDeliverAlerts() {
+        Task { @MainActor in
+            await self.appState.refreshSpend()
+            for alert in self.appState.alertMessagesAfterRefresh() {
+                Notifier.sendBalanceAlert(providerID: alert.providerID,
+                                          providerName: alert.providerName,
+                                          body: alert.message)
+            }
+        }
+    }
+
+    private func startRefreshTimer() {
+        refreshTimer?.invalidate()
+        let interval = TimeInterval(max(1, appState.config.refreshIntervalMinutes) * 60)
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.refreshAndDeliverAlerts()
+            }
+        }
     }
 
     @objc private func statusItemClicked(_ sender: Any?) {

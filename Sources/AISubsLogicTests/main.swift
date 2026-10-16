@@ -174,6 +174,17 @@ do {
     check(abs(total - 5.5) < 0.0001, "Anthropic parser tolerates numeric cent values (got \(total))")
 }
 
+// MARK: - AlertEdgeDetector (fire on rising edge only)
+
+do {
+    var detector = AlertEdgeDetector()
+    check(!detector.shouldFire(nowAlerting: false), "no alert while healthy")
+    check(detector.shouldFire(nowAlerting: true), "fires when crossing into alert state")
+    check(!detector.shouldFire(nowAlerting: true), "stays silent while already alerting")
+    check(!detector.shouldFire(nowAlerting: false), "silent on recovery")
+    check(detector.shouldFire(nowAlerting: true), "fires again on a new crossing")
+}
+
 // MARK: - Summary
 
 print("")

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ServiceManagement
 import AISubsCore
 
 /// Sheet presentation state without @State macros.
@@ -58,6 +59,7 @@ final class SettingsWindowController {
     private var window: NSWindow?
     private let sheetModel = SheetModel()
     private let apiKeyForm = APIKeyForm()
+    private let generalForm = GeneralForm()
 
     func show(appState: AppState) {
         apiKeyForm.load(from: appState)
@@ -66,7 +68,8 @@ final class SettingsWindowController {
             let hosting = NSHostingController(rootView: SettingsRootView(
                 appState: appState,
                 sheetModel: sheetModel,
-                apiKeyForm: apiKeyForm
+                apiKeyForm: apiKeyForm,
+                generalForm: generalForm
             ))
             let newWindow = NSWindow(contentViewController: hosting)
             newWindow.title = "AI Subs — Settings"
@@ -86,6 +89,7 @@ struct SettingsRootView: View {
     @ObservedObject var appState: AppState
     @ObservedObject var sheetModel: SheetModel
     @ObservedObject var apiKeyForm: APIKeyForm
+    @ObservedObject var generalForm: GeneralForm
 
     var body: some View {
         TabView {
@@ -93,8 +97,67 @@ struct SettingsRootView: View {
                 .tabItem { Label("Subscriptions", systemImage: "list.bullet") }
             APIKeysTab(appState: appState, form: apiKeyForm)
                 .tabItem { Label("API", systemImage: "key.horizontal") }
+            GeneralTab(appState: appState, form: generalForm)
+                .tabItem { Label("General", systemImage: "gearshape") }
         }
-        .frame(minWidth: 460, minHeight: 520)
+        .frame(minWidth: 460, minHeight: 540)
+    }
+}
+
+// MARK: - General tab
+
+@MainActor
+final class GeneralForm: ObservableObject {
+    @Published var status: String?
+}
+
+struct GeneralTab: View {
+    @ObservedObject var appState: AppState
+    @ObservedObject var form: GeneralForm
+
+    var body: some View {
+        Form {
+            Stepper(value: Binding(
+                get: { appState.config.notifyDaysBeforeRenewal },
+                set: { appState.config.notifyDaysBeforeRenewal = $0 }
+            ), in: 0...14) {
+                Text("Renewal notice: \(appState.config.notifyDaysBeforeRenewal) day(s) before, at 9:00")
+            }
+
+            Picker("Refresh API spend every", selection: Binding(
+                get: { appState.config.refreshIntervalMinutes },
+                set: { appState.config.refreshIntervalMinutes = $0 }
+            )) {
+                Text("5 minutes").tag(5)
+                Text("15 minutes").tag(15)
+                Text("30 minutes").tag(30)
+                Text("60 minutes").tag(60)
+            }
+
+            Toggle("Launch at login", isOn: Binding(
+                get: { SMAppService.mainApp.status == .enabled },
+                set: { enabled in
+                    do {
+                        if enabled {
+                            try SMAppService.mainApp.register()
+                        } else {
+                            try SMAppService.mainApp.unregister()
+                        }
+                        form.status = nil
+                    } catch {
+                        form.status = "Launch at login: \(error.localizedDescription). " +
+                            "Tip: install the app in /Applications first (scripts/install.sh)."
+                    }
+                }
+            ))
+
+            if let status = form.status {
+                Text(status)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+        }
+        .padding(16)
     }
 }
 

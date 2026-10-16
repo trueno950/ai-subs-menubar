@@ -36,6 +36,20 @@ public enum RenewalMath {
     }
 }
 
+/// Rising-edge detector so an alert fires once per crossing, not every refresh.
+public struct AlertEdgeDetector: Sendable {
+    private var wasAlerting = false
+
+    public init() {}
+
+    /// Returns true only on the transition from healthy to alerting.
+    public mutating func shouldFire(nowAlerting: Bool) -> Bool {
+        let fire = nowAlerting && !wasAlerting
+        wasAlerting = nowAlerting
+        return fire
+    }
+}
+
 /// Pure math for estimated API balances and alerts.
 public enum BalanceMath {
     /// Estimated remaining credit: last manual top-up minus month-to-date spend.

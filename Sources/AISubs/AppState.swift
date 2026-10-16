@@ -88,6 +88,35 @@ final class AppState: ObservableObject {
         return BalanceMath.estimatedBalance(topUpUSD: topUp, monthToDateSpendUSD: mtd)
     }
 
+    /// Rising-edge alert evaluation after each spend refresh. Returns the
+    /// provider alerts that should be delivered now.
+    func alertMessagesAfterRefresh() -> [(providerID: String, providerName: String, message: String)] {
+        var messages: [(String, String, String)] = []
+        for provider in config.providers where provider.enabled {
+            guard let threshold = provider.alertThresholdUSD else { continue }
+            let snapshot = spend[provider.id]
+            let mtd = (snapshot?.error == nil) ? (snapshot?.monthToDateUSD ?? 0) : 0
+            let estimated = estimatedBalanceUSD(for: provider)
+            let nowAlerting = BalanceMath.shouldAlert(estimatedBalanceUSD: estimated,
+                                                      monthToDateSpendUSD: mtd,
+                                                      thresholdUSD: threshold)
+            var detector = alertDetectors[provider.id] ?? AlertEdgeDetector()
+            if detector.shouldFire(nowAlerting: nowAlerting) {
+                let body: String
+                if let estimated {
+                    body = "Estimated balance \(estimated.formatted(.currency(code: "USD"))) is below \(threshold.formatted(.currency(code: "USD")))"
+                } else {
+                    body = "Month-to-date spend \(mtd.formatted(.currency(code: "USD"))) exceeds \(threshold.formatted(.currency(code: "USD")))"
+                }
+                messages.append((provider.id, provider.displayName, body))
+            }
+            alertDetectors[provider.id] = detector
+        }
+        return messages
+    }
+
+    private var alertDetectors: [String: AlertEdgeDetector] = [:]
+
     // MARK: - Mutations
 
     func upsert(_ subscription: AISubscription) {
