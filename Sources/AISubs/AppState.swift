@@ -43,6 +43,51 @@ final class AppState: ObservableObject {
         RenewalMath.daysUntil(nextRenewal(for: subscription), from: Date(), calendar: .current)
     }
 
+    // MARK: - Live API spend
+
+    @Published var spend: [String: ProviderSpendSnapshot] = [:]
+    @Published private(set) var isRefreshing = false
+
+    /// Fetches month-to-date spend for every enabled provider.
+    func refreshSpend() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
+        for provider in config.providers {
+            guard provider.enabled else { continue }
+            let keyAccount = "apikey-\(provider.id)"
+            guard let key = KeychainStore.get(keyAccount), !key.isEmpty else {
+                spend[provider.id] = ProviderSpendSnapshot(
+                    providerID: provider.id, monthToDateUSD: 0, fetchedAt: Date(),
+                    error: "No API key configured")
+                continue
+            }
+
+            let client: CostFetching = provider.id == "openai"
+                ? OpenAICostClient(apiKey: key)
+                : AnthropicCostClient(apiKey: key)
+
+            do {
+                let usd = try await client.monthToDateSpend(now: Date())
+                spend[provider.id] = ProviderSpendSnapshot(
+                    providerID: provider.id, monthToDateUSD: usd, fetchedAt: Date(), error: nil)
+            } catch {
+                spend[provider.id] = ProviderSpendSnapshot(
+                    providerID: provider.id, monthToDateUSD: 0, fetchedAt: Date(),
+                    error: error.localizedDescription)
+            }
+        }
+    }
+
+    /// Estimated remaining credit, only when the user set a top-up.
+    func estimatedBalanceUSD(for provider: ProviderSettings) -> Double? {
+        guard let topUp = provider.lastTopUpUSD else { return nil }
+        let snapshot = spend[provider.id]
+        let mtd = (snapshot?.error == nil) ? (snapshot?.monthToDateUSD ?? 0) : 0
+        return BalanceMath.estimatedBalance(topUpUSD: topUp, monthToDateSpendUSD: mtd)
+    }
+
     // MARK: - Mutations
 
     func upsert(_ subscription: AISubscription) {

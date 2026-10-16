@@ -124,6 +124,56 @@ do {
     try? FileManager.default.removeItem(at: dir)
 }
 
+// MARK: - CostWindow
+
+do {
+    let start = CostWindow.monthStartUTC(for: date(2026, 3, 10))
+    checkEqual(cal.dateComponents([.year, .month, .day], from: start),
+               DateComponents(year: 2026, month: 3, day: 1),
+               "monthStartUTC is first day of the month (UTC)")
+    let range = CostWindow.monthRangeUTC(for: date(2026, 1, 15))
+    checkEqual(cal.dateComponents([.year, .month, .day], from: range.end),
+               DateComponents(year: 2026, month: 2, day: 1),
+               "monthRangeUTC end is exclusive first day of next month")
+}
+
+// MARK: - OpenAI costs parsing
+
+do {
+    let sample = """
+    {"object":"list","data":[
+      {"object":"bucket","start_time":1740787200,"end_time":1740873600,"results":[
+        {"object":"organization.costs.result","amount":{"value":1.25,"currency":"usd"},"line_item":null,"project_id":null,"organization_id":"org-1"},
+        {"object":"organization.costs.result","amount":{"value":0.75,"currency":"usd"},"line_item":null,"project_id":null,"organization_id":"org-1"}]},
+      {"object":"bucket","start_time":1740873600,"end_time":1740960000,"results":[
+        {"object":"organization.costs.result","amount":{"value":2.0,"currency":"usd"},"line_item":null,"project_id":null,"organization_id":"org-1"}]},
+      {"object":"bucket","start_time":1740960000,"end_time":1741046400,"results":[]}
+    ],"has_more":false,"next_page":null}
+    """
+    let total = try OpenAICostParser.monthToDate(from: Data(sample.utf8))
+    check(abs(total - 4.0) < 0.0001, "OpenAI bucket results sum to month-to-date spend (got \(total))")
+}
+
+// MARK: - Anthropic cost report parsing
+
+do {
+    let sample = """
+    {"data":[
+      {"cost":"1234","currency":"usd","description":"Claude Sonnet","starting_at":"2026-03-01T00:00:00Z","ending_at":"2026-03-02T00:00:00Z"},
+      {"cost":"766","currency":"usd","description":"Web Search","starting_at":"2026-03-02T00:00:00Z","ending_at":"2026-03-03T00:00:00Z"}
+    ],"has_more":false,"next_page":null}
+    """
+    let total = try AnthropicCostParser.monthToDate(from: Data(sample.utf8))
+    check(abs(total - 20.0) < 0.0001, "Anthropic cent strings sum to dollars (got \(total))")
+}
+do {
+    let sample = """
+    {"data":[{"cost":550,"currency":"usd","description":"Claude"}],"has_more":false}
+    """
+    let total = try AnthropicCostParser.monthToDate(from: Data(sample.utf8))
+    check(abs(total - 5.5) < 0.0001, "Anthropic parser tolerates numeric cent values (got \(total))")
+}
+
 // MARK: - Summary
 
 print("")
