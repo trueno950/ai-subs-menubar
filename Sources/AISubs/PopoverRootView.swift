@@ -11,8 +11,8 @@ struct PopoverRootView: View {
             header
             Divider().opacity(0.25)
             ScrollView {
-                VStack(spacing: 12) {
-                    sectionTitle("Subscriptions")
+                VStack(spacing: 8) {
+                    sectionTitle("Plans")
                     if appState.config.subscriptions.isEmpty {
                         emptyState
                     } else {
@@ -21,7 +21,7 @@ struct PopoverRootView: View {
                         }
                     }
 
-                    sectionTitle("API spend (month)")
+                    sectionTitle("API usage")
                     apiSection
                 }
                 .padding(14)
@@ -39,23 +39,41 @@ struct PopoverRootView: View {
     // MARK: - Pieces
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.pink.gradient)
-            Text("AI Subs")
-                .font(.system(size: 15, weight: .semibold))
-            Spacer()
-            VStack(alignment: .trailing, spacing: 1) {
-                Text(appState.monthlyTotalUSD, format: .currency(code: "USD"))
-                    .font(.system(.title3, design: .rounded).monospacedDigit().weight(.bold))
-                Text("per month")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.pink.gradient)
+                Text("AI Subs")
+                    .font(.headline)
+                Spacer()
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                summaryMetric(
+                    title: "Plans / month",
+                    value: appState.monthlyTotalUSD.formatted(.currency(code: "USD")))
+                Spacer(minLength: 4)
+                summaryMetric(
+                    title: "API spend / MTD",
+                    value: appState.monthToDateAPIUSD?.formatted(.currency(code: "USD")) ?? "—")
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
+    }
+
+    private func summaryMetric(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            Text(value)
+                .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
     }
 
     private var emptyState: some View {
@@ -75,7 +93,7 @@ struct PopoverRootView: View {
     }
 
     private var apiSection: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             ForEach(appState.config.providers, id: \.id) { provider in
                 APIProviderRow(appState: appState, provider: provider)
             }
@@ -133,50 +151,98 @@ struct APIProviderRow: View {
     let provider: ProviderSettings
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: provider.id == "openai" ? "burst.fill" : (provider.id == "zai" ? "cpu" : "paintbrush.pointed.fill"))
-                .foregroundStyle(.secondary)
-                .frame(width: 22)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(provider.displayName)
-                    .font(.system(size: 13, weight: .medium))
-                caption
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 10) {
+                Image(systemName: provider.id == "openai" ? "burst.fill" : (provider.id == "zai" ? "cpu" : "paintbrush.pointed.fill"))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(provider.displayName)
+                        .font(.body.weight(.medium))
+                    caption
+                }
+                Spacer(minLength: 8)
+                if !provider.enabled {
+                    Text("Disabled")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if connectionState == .notConnected {
+                    Label("Not connected", systemImage: "link.slash")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if connectionState == .error {
+                    Label("Error", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .help(appState.spend[provider.id]?.error ?? "Provider request failed")
+                } else if let percent = quotaPercent {
+                    Text("\(percent.formatted(.number.precision(.fractionLength(0))))% used")
+                        .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
+                        .foregroundStyle(percent >= QuotaAlertRule.glmThresholdPercent ? Color.red : Color.primary)
+                } else if provider.id == "zai", let snapshot = appState.spend[provider.id], snapshot.error == nil {
+                    Text("—")
+                        .font(.system(.callout, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                } else if let snapshot = appState.spend[provider.id], snapshot.error == nil {
+                    Text(snapshot.monthToDateUSD, format: .currency(code: "USD"))
+                        .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
+                } else {
+                    Text("—")
+                        .font(.system(.callout, design: .rounded).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
             }
-            Spacer()
-            if let percent = appState.spend[provider.id]?.quotaUsedPercent {
-                Text("\(Int(percent))%")
-                    .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
-                    .foregroundStyle(percent >= 90 ? Color.red : Color.primary)
-            } else if let snapshot = appState.spend[provider.id], snapshot.error == nil {
-                Text(snapshot.monthToDateUSD, format: .currency(code: "USD"))
-                    .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
-            } else if appState.spend[provider.id]?.error != nil {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .help(appState.spend[provider.id]?.error ?? "")
-            } else {
-                Text("—")
-                    .font(.system(.callout, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.tertiary)
+            if provider.enabled,
+               let percent = quotaPercent,
+               let progress = QuotaMath.progressFraction(usedPercent: percent) {
+                HStack(spacing: 8) {
+                    ProgressView(value: progress)
+                        .tint(percent >= QuotaAlertRule.glmThresholdPercent ? .red : .accentColor)
+                        .accessibilityLabel("GLM quota usage")
+                        .accessibilityValue("\(percent.formatted(.number.precision(.fractionLength(0)))) percent used")
+                    if let remaining = QuotaMath.remainingPercent(usedPercent: percent) {
+                        Text("\(remaining.formatted(.number.precision(.fractionLength(0))))% remaining")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
+                .padding(.leading, 32)
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .opacity(provider.enabled ? 1 : 0.45)
+        .padding(.vertical, 7)
+    }
+
+    private var quotaPercent: Double? {
+        guard let percent = appState.spend[provider.id]?.quotaUsedPercent,
+              percent.isFinite else { return nil }
+        return percent
+    }
+
+    private var connectionState: ProviderConnectionState {
+        appState.connectionState(for: provider)
     }
 
     @ViewBuilder
     private var caption: some View {
-        if let reset = appState.spend[provider.id]?.quotaResetAt {
-            Text("resets \(reset.formatted(date: .abbreviated, time: .omitted)) · \(Int(appState.spend[provider.id]?.quotaUsedPercent ?? 0))% used")
-                .font(.caption2.monospacedDigit())
+        if !provider.enabled {
+            Text("disabled")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        } else if connectionState == .notConnected {
+            Text("Add an API key in Settings → API")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        } else if let reset = appState.spend[provider.id]?.quotaResetAt {
+            Text("resets \(reset.formatted(date: .abbreviated, time: .omitted))")
+                .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
         } else if provider.id == "zai", let snapshot = appState.spend[provider.id], snapshot.error == nil {
             Text("plan quota")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
-        } else if let snapshot = appState.spend[provider.id], let error = snapshot.error {
+        } else if connectionState == .error, let error = appState.spend[provider.id]?.error {
             Text(error)
                 .font(.caption2)
                 .foregroundStyle(.orange)
@@ -186,7 +252,7 @@ struct APIProviderRow: View {
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(balanceColor(balance))
         } else {
-            Text(provider.enabled ? "no top-up set" : "disabled")
+            Text("no top-up set")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -221,8 +287,7 @@ struct SubscriptionCard: View {
                 .font(.system(.callout, design: .rounded).monospacedDigit().weight(.semibold))
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 7)
     }
 
     private var icon: some View {

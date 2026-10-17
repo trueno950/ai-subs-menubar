@@ -9,12 +9,15 @@ final class EditorForm: ObservableObject {
     @Published var priceText: String
     @Published var renewalDay: Int
     @Published var symbol: String
+    let priceIsSuggestion: Bool
 
-    init(name: String = "", priceText: String = "", renewalDay: Int = 1, symbol: String = "sparkles") {
+    init(name: String = "", priceText: String = "", renewalDay: Int = 1,
+         symbol: String = "sparkles", priceIsSuggestion: Bool = false) {
         self.name = name
         self.priceText = priceText
         self.renewalDay = renewalDay
         self.symbol = symbol
+        self.priceIsSuggestion = priceIsSuggestion
     }
 
     static func forSubscription(_ subscription: AISubscription) -> EditorForm {
@@ -22,6 +25,14 @@ final class EditorForm: ObservableObject {
                    priceText: String(format: "%.2f", subscription.monthlyPriceUSD),
                    renewalDay: subscription.renewalDay,
                    symbol: subscription.symbol)
+    }
+
+    static func forPreset(_ preset: AISubscriptionQuickAddPreset) -> EditorForm {
+        EditorForm(name: preset.displayName,
+                   priceText: String(format: "%.2f", preset.suggestedMonthlyPriceUSD),
+                   renewalDay: 1,
+                   symbol: preset.symbol,
+                   priceIsSuggestion: true)
     }
 
     var isValid: Bool {
@@ -57,6 +68,12 @@ struct SubscriptionEditor: View {
         VStack(alignment: .leading, spacing: 14) {
             Text(mode.existing == nil ? "Add Subscription" : "Edit Subscription")
                 .font(.headline)
+
+            if form.priceIsSuggestion {
+                Text("Suggested price. Confirm the amount and renewal day before saving.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             Form {
                 TextField("Name", text: $form.name)

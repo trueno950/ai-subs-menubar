@@ -24,6 +24,10 @@ final class SheetModel: ObservableObject {
         }
     }
 
+    func present(_ preset: AISubscriptionQuickAddPreset) {
+        session = Session(mode: .add, form: .forPreset(preset))
+    }
+
     func dismiss() {
         session = nil
     }
@@ -182,6 +186,17 @@ struct SubscriptionsTab: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Menu {
+                    ForEach(AISubscriptionQuickAddPreset.allCases) { preset in
+                        Button {
+                            sheetModel.present(preset)
+                        } label: {
+                            Text("\(preset.displayName) · \(preset.suggestedMonthlyPriceUSD.formatted(.currency(code: "USD")))/mo")
+                        }
+                    }
+                } label: {
+                    Label("Quick add", systemImage: "bolt")
+                }
                 Button {
                     sheetModel.present(.add)
                 } label: {

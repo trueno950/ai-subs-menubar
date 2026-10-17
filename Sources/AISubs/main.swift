@@ -53,9 +53,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor in
             await self.appState.refreshSpend()
             for alert in self.appState.alertMessagesAfterRefresh() {
-                Notifier.sendBalanceAlert(providerID: alert.providerID,
-                                          providerName: alert.providerName,
-                                          body: alert.message)
+                switch alert.kind {
+                case .balance:
+                    Notifier.sendBalanceAlert(providerID: alert.providerID,
+                                              providerName: alert.providerName,
+                                              body: alert.message)
+                case .quota:
+                    Notifier.sendQuotaAlert(providerID: alert.providerID,
+                                            providerName: alert.providerName,
+                                            body: alert.message)
+                }
             }
         }
     }

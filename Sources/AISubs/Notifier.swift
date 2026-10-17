@@ -65,4 +65,16 @@ enum Notifier {
             content: content, trigger: trigger)
         UNUserNotificationCenter.current().add(request)
     }
+
+    static func sendQuotaAlert(providerID: String, providerName: String, body: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "\(providerName) — quota alert"
+        content.body = body
+        content.sound = .default
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        let request = UNNotificationRequest(
+            identifier: "quota-\(providerID)-\(Int(Date().timeIntervalSince1970))",
+            content: content, trigger: trigger)
+        UNUserNotificationCenter.current().add(request)
+    }
 }

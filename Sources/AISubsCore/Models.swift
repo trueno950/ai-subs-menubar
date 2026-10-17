@@ -18,6 +18,45 @@ public struct AISubscription: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// Editable initial values for the most common monthly AI plans.
+/// Prices are regular USD list-price suggestions and may vary by region or promotion.
+public enum AISubscriptionQuickAddPreset: String, CaseIterable, Identifiable, Sendable {
+    case chatGPTPlus
+    case claudePro
+    case glmCodingPlanLite
+    case glmCodingPlanPro
+    case glmCodingPlanMax
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .chatGPTPlus: return "ChatGPT Plus"
+        case .claudePro: return "Claude Pro"
+        case .glmCodingPlanLite: return "GLM Coding Plan Lite"
+        case .glmCodingPlanPro: return "GLM Coding Plan Pro"
+        case .glmCodingPlanMax: return "GLM Coding Plan Max"
+        }
+    }
+
+    public var suggestedMonthlyPriceUSD: Double {
+        switch self {
+        case .chatGPTPlus, .claudePro: return 20
+        case .glmCodingPlanLite: return 18
+        case .glmCodingPlanPro: return 80
+        case .glmCodingPlanMax: return 168
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .chatGPTPlus: return "sparkles"
+        case .claudePro: return "paintbrush.pointed.fill"
+        case .glmCodingPlanLite, .glmCodingPlanPro, .glmCodingPlanMax: return "cpu"
+        }
+    }
+}
+
 /// Configuration for one live API provider ("openai" or "anthropic").
 public struct ProviderSettings: Codable, Hashable, Sendable {
     public var id: String

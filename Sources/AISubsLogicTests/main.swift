@@ -185,6 +185,90 @@ do {
     check(detector.shouldFire(nowAlerting: true), "fires again on a new crossing")
 }
 
+// MARK: - Provider connection states
+
+do {
+    checkEqual(ProviderConnectionState.resolve(hasAPIKey: false, hasError: false), .notConnected,
+               "missing API key is a neutral not-connected state")
+    checkEqual(ProviderConnectionState.resolve(hasAPIKey: false, hasError: true), .notConnected,
+               "missing API key does not surface an error as a connection warning")
+    checkEqual(ProviderConnectionState.resolve(hasAPIKey: true, hasError: false), .connected,
+               "configured provider without a request error is connected")
+    checkEqual(ProviderConnectionState.resolve(hasAPIKey: true, hasError: true), .error,
+               "configured provider request failure is an error state")
+}
+
+// MARK: - GLM quota alert threshold
+
+do {
+    check(!QuotaAlertRule.shouldAlert(usedPercent: nil, thresholdPercent: 90),
+          "missing quota data does not trigger a quota alert")
+    check(!QuotaAlertRule.shouldAlert(usedPercent: .nan, thresholdPercent: 90),
+          "invalid quota percentage does not trigger a quota alert")
+    check(!QuotaAlertRule.shouldAlert(usedPercent: 89.99, thresholdPercent: 90),
+          "quota below 90 percent does not alert")
+    check(QuotaAlertRule.shouldAlert(usedPercent: 90, thresholdPercent: 90),
+          "quota at 90 percent crosses the alert threshold")
+    check(QuotaAlertRule.shouldAlert(usedPercent: 100, thresholdPercent: 90),
+          "quota above 90 percent alerts")
+}
+
+// MARK: - API month-to-date summary
+
+do {
+    let providers = [
+        ProviderSettings(id: "openai", displayName: "OpenAI", enabled: true),
+        ProviderSettings(id: "anthropic", displayName: "Anthropic", enabled: true),
+        ProviderSettings(id: "zai", displayName: "Z.ai GLM", enabled: true),
+        ProviderSettings(id: "disabled", displayName: "Disabled", enabled: false),
+        ProviderSettings(id: "broken", displayName: "Broken", enabled: true)
+    ]
+    let fetchedAt = date(2026, 3, 10)
+    let snapshots = [
+        "openai": ProviderSpendSnapshot(providerID: "openai", monthToDateUSD: 12.5,
+                                         fetchedAt: fetchedAt, error: nil),
+        "anthropic": ProviderSpendSnapshot(providerID: "anthropic", monthToDateUSD: 7.5,
+                                            fetchedAt: fetchedAt, error: nil),
+        "zai": ProviderSpendSnapshot(providerID: "zai", monthToDateUSD: 0,
+                                      fetchedAt: fetchedAt, error: nil, quotaUsedPercent: 92),
+        "disabled": ProviderSpendSnapshot(providerID: "disabled", monthToDateUSD: 100,
+                                           fetchedAt: fetchedAt, error: nil),
+        "broken": ProviderSpendSnapshot(providerID: "broken", monthToDateUSD: 99,
+                                         fetchedAt: fetchedAt, error: "request failed")
+    ]
+    let total = SpendSummaryMath.monthToDateAPIUSD(providers: providers, snapshots: snapshots)
+    check(total == 20, "API spend sums only successful enabled monetary providers (got \(String(describing: total)))")
+    check(SpendSummaryMath.monthToDateAPIUSD(
+        providers: [providers[2], providers[4]], snapshots: snapshots) == nil,
+        "no successful monetary provider yields no API spend total")
+}
+
+// MARK: - Quick-add subscription presets
+
+do {
+    checkEqual(AISubscriptionQuickAddPreset.chatGPTPlus.displayName, "ChatGPT Plus",
+               "ChatGPT Plus quick-add preset has the expected editable name")
+    check(AISubscriptionQuickAddPreset.chatGPTPlus.suggestedMonthlyPriceUSD == 20,
+          "ChatGPT Plus quick-add preset suggests 20 USD")
+    check(AISubscriptionQuickAddPreset.claudePro.suggestedMonthlyPriceUSD == 20,
+          "Claude Pro quick-add preset suggests 20 USD")
+    check(AISubscriptionQuickAddPreset.glmCodingPlanLite.suggestedMonthlyPriceUSD == 18
+          && AISubscriptionQuickAddPreset.glmCodingPlanPro.suggestedMonthlyPriceUSD == 80
+          && AISubscriptionQuickAddPreset.glmCodingPlanMax.suggestedMonthlyPriceUSD == 168,
+          "GLM Coding Plan presets expose editable regular list-price suggestions for each tier")
+}
+
+// MARK: - Quota remaining percentage
+
+do {
+    check(QuotaMath.remainingPercent(usedPercent: 90) == 10,
+          "90 percent used leaves 10 percent remaining")
+    check(QuotaMath.remainingPercent(usedPercent: 120) == 0,
+          "quota above 100 percent clamps remaining to zero")
+    check(QuotaMath.remainingPercent(usedPercent: nil) == nil,
+          "missing quota data has no remaining percentage")
+}
+
 // MARK: - ZaiQuotaParser (GLM Coding Plan quota)
 
 do {

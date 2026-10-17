@@ -2,6 +2,11 @@ import Foundation
 import Combine
 import AISubsCore
 
+enum ProviderAlertKind {
+    case balance
+    case quota
+}
+
 /// Single source of truth for configuration, shared by the popover and the
 /// settings window. Mutations persist immediately.
 @MainActor
@@ -34,6 +39,10 @@ final class AppState: ObservableObject {
         RenewalMath.monthlyTotal(config.subscriptions)
     }
 
+    var monthToDateAPIUSD: Double? {
+        SpendSummaryMath.monthToDateAPIUSD(providers: config.providers, snapshots: spend)
+    }
+
     func nextRenewal(for subscription: AISubscription) -> Date {
         RenewalMath.nextRenewal(from: Date(), dayOfMonth: subscription.renewalDay,
                                 calendar: .current)
@@ -41,6 +50,14 @@ final class AppState: ObservableObject {
 
     func daysUntilRenewal(for subscription: AISubscription) -> Int {
         RenewalMath.daysUntil(nextRenewal(for: subscription), from: Date(), calendar: .current)
+    }
+
+    func connectionState(for provider: ProviderSettings) -> ProviderConnectionState {
+        let key = KeychainStore.get("apikey-\(provider.id)")
+        let hasAPIKey = key.map { !$0.isEmpty } ?? false
+        return ProviderConnectionState.resolve(
+            hasAPIKey: hasAPIKey,
+            hasError: spend[provider.id]?.error != nil)
     }
 
     // MARK: - Live API spend
@@ -105,17 +122,45 @@ final class AppState: ObservableObject {
 
     /// Rising-edge alert evaluation after each spend refresh. Returns the
     /// provider alerts that should be delivered now.
-    func alertMessagesAfterRefresh() -> [(providerID: String, providerName: String, message: String)] {
-        var messages: [(String, String, String)] = []
+    func alertMessagesAfterRefresh() -> [(providerID: String, providerName: String, message: String, kind: ProviderAlertKind)] {
+        var messages: [(String, String, String, ProviderAlertKind)] = []
         for provider in config.providers where provider.enabled {
+            if provider.id == "zai" {
+                var detector = quotaAlertDetectors[provider.id] ?? AlertEdgeDetector()
+                let snapshot = spend[provider.id]
+                let usedPercent = connectionState(for: provider) == .connected && snapshot?.error == nil
+                    ? snapshot?.quotaUsedPercent
+                    : nil
+                let nowAlerting = QuotaAlertRule.shouldAlert(
+                    usedPercent: usedPercent,
+                    thresholdPercent: QuotaAlertRule.glmThresholdPercent)
+                if detector.shouldFire(nowAlerting: nowAlerting), let usedPercent {
+                    let remainingPercent = max(0, 100 - usedPercent)
+                    var body = "GLM Coding Plan quota is \(Int(usedPercent))% used (\(Int(remainingPercent))% remaining)."
+                    if let reset = snapshot?.quotaResetAt {
+                        body += " Resets \(reset.formatted(date: .abbreviated, time: .omitted))."
+                    }
+                    messages.append((provider.id, provider.displayName, body, .quota))
+                }
+                quotaAlertDetectors[provider.id] = detector
+                continue
+            }
+
             guard let threshold = provider.alertThresholdUSD else { continue }
-            let snapshot = spend[provider.id]
-            let mtd = (snapshot?.error == nil) ? (snapshot?.monthToDateUSD ?? 0) : 0
+            var detector = alertDetectors[provider.id] ?? AlertEdgeDetector()
+            guard connectionState(for: provider) == .connected,
+                  let snapshot = spend[provider.id],
+                  snapshot.error == nil else {
+                _ = detector.shouldFire(nowAlerting: false)
+                alertDetectors[provider.id] = detector
+                continue
+            }
+
+            let mtd = snapshot.monthToDateUSD
             let estimated = estimatedBalanceUSD(for: provider)
             let nowAlerting = BalanceMath.shouldAlert(estimatedBalanceUSD: estimated,
                                                       monthToDateSpendUSD: mtd,
                                                       thresholdUSD: threshold)
-            var detector = alertDetectors[provider.id] ?? AlertEdgeDetector()
             if detector.shouldFire(nowAlerting: nowAlerting) {
                 let body: String
                 if let estimated {
@@ -123,7 +168,7 @@ final class AppState: ObservableObject {
                 } else {
                     body = "Month-to-date spend \(mtd.formatted(.currency(code: "USD"))) exceeds \(threshold.formatted(.currency(code: "USD")))"
                 }
-                messages.append((provider.id, provider.displayName, body))
+                messages.append((provider.id, provider.displayName, body, .balance))
             }
             alertDetectors[provider.id] = detector
         }
@@ -131,6 +176,7 @@ final class AppState: ObservableObject {
     }
 
     private var alertDetectors: [String: AlertEdgeDetector] = [:]
+    private var quotaAlertDetectors: [String: AlertEdgeDetector] = [:]
 
     // MARK: - Mutations
 
