@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-17T00:15:40Z",
+  "title": "Design System: AI Subs",
+  "extensions": {
+    "colorMeta": {},
+    "typographyMeta": {
+      "title": {
+        "displayName": "Panel title",
+        "purpose": "Native system sans for the compact menu panel heading."
+      },
+      "metric": {
+        "displayName": "Usage metric",
+        "purpose": "Rounded system figures with monospaced digits for values that change."
+      }
+    },
+    "shadows": [
+      {
+        "name": "menu-panel-shadow",
+        "value": "NSPanel.hasShadow = true (native AppKit shadow)",
+        "purpose": "Separate the single HUD panel from the desktop without lifting each data row."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-feedback",
+        "value": "Native SwiftUI/AppKit state transitions",
+        "purpose": "Communicate state changes only; avoid decorative motion."
+      }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Menu Panel",
+      "kind": "custom",
+      "refersTo": "menu-panel",
+      "description": "One adaptive macOS-style glass surface around the compact usage panel.",
+      "html": "<section class=\"ds-menu-panel\"><h2>AI Subs</h2><div class=\"ds-menu-panel-content\"><slot></slot></div></section>",
+      "css": ".ds-menu-panel { color-scheme: light dark; color: CanvasText; background: color-mix(in srgb, Canvas 86%, transparent); -webkit-backdrop-filter: blur(22px) saturate(130%); backdrop-filter: blur(22px) saturate(130%); border: 1px solid color-mix(in srgb, CanvasText 12%, transparent); border-radius: 14px; box-shadow: 0 8px 24px color-mix(in srgb, CanvasText 16%, transparent); padding: 12px; font: 13px -apple-system, BlinkMacSystemFont, system-ui, sans-serif; } .ds-menu-panel h2 { margin: 0 0 10px; font-size: 15px; font-weight: 600; } .ds-menu-panel-content { min-width: 0; }"
+    },
+    {
+      "name": "Provider Row",
+      "kind": "custom",
+      "refersTo": "provider-row",
+      "description": "Flat, compact row with a provider label, explicit status, and trailing metric.",
+      "html": "<div class=\"ds-provider-row\"><span class=\"ds-provider-icon\" aria-hidden=\"true\">GLM</span><span class=\"ds-provider-copy\"><strong>Z.ai GLM</strong><small>Resets today · 3% left</small></span><strong class=\"ds-provider-metric\">97%</strong></div>",
+      "css": ".ds-provider-row { color-scheme: light dark; color: CanvasText; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); font: 13px -apple-system, BlinkMacSystemFont, system-ui, sans-serif; } .ds-provider-row:last-child { border-bottom: 0; } .ds-provider-icon { color: GrayText; font-size: 10px; font-weight: 600; } .ds-provider-copy { display: grid; gap: 2px; min-width: 0; } .ds-provider-copy strong { font-weight: 600; } .ds-provider-copy small { color: GrayText; font-size: 11px; } .ds-provider-metric { font: 700 17px ui-rounded, -apple-system, system-ui, sans-serif; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Quota Meter",
+      "kind": "custom",
+      "refersTo": "quota-meter",
+      "description": "A thin meter that reinforces, but never replaces, the displayed percentage and reset text.",
+      "html": "<div class=\"ds-quota-meter\" role=\"meter\" aria-label=\"GLM quota used\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"97\" style=\"--ds-quota-value: 97%\"><span></span></div>",
+      "css": ".ds-quota-meter { height: 4px; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, CanvasText 14%, transparent); } .ds-quota-meter span { display: block; width: var(--ds-quota-value); height: 100%; border-radius: inherit; background: AccentColor; } .ds-quota-meter[data-critical=\"true\"] span { background: Mark; }"
+    },
+    {
+      "name": "Connection Status",
+      "kind": "chip",
+      "description": "Neutral when setup is missing; failures use a warning icon and readable text.",
+      "html": "<span class=\"ds-connection-status\"><svg viewBox=\"0 0 16 16\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>Not connected</span>",
+      "css": ".ds-connection-status { color: GrayText; display: inline-flex; align-items: center; gap: 5px; font: 11px -apple-system, BlinkMacSystemFont, system-ui, sans-serif; } .ds-connection-status svg { width: 14px; height: 14px; } .ds-connection-status[data-error=\"true\"] { color: Mark; }"
+    },
+    {
+      "name": "Quick Add Button",
+      "kind": "button",
+      "refersTo": "menu-action",
+      "description": "Small native-feeling action for adding a named plan preset without guessing its price or renewal date.",
+      "html": "<button class=\"ds-quick-add\" type=\"button\"><span aria-hidden=\"true\">＋</span> ChatGPT Plus</button>",
+      "css": ".ds-quick-add { color: AccentColor; background: color-mix(in srgb, AccentColor 10%, Canvas); border: 1px solid color-mix(in srgb, AccentColor 24%, transparent); border-radius: 7px; min-height: 28px; padding: 6px 8px; font: 600 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif; cursor: pointer; transition: background-color 160ms ease-out; } .ds-quick-add:hover { background: color-mix(in srgb, AccentColor 16%, Canvas); } .ds-quick-add:focus-visible { outline: 2px solid AccentColor; outline-offset: 2px; } .ds-quick-add:active { background: color-mix(in srgb, AccentColor 22%, Canvas); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Precision Instrument",
+    "overview": "AI Subs is a personal macOS utility for checking subscription renewals, API spend, and coding-plan quota without leaving the current task. Its visual language should feel like a native menu-bar extra: compact, calm, and immediately legible. Keep one translucent HUD-like panel as the frame; inside it, prefer dense, table-like provider rows over a stack of repeated cards.\n\nThe palette and controls adapt to macOS appearance and accent settings. A number must always say what it measures: recurring plan cost, month-to-date API spend, or a provider's own quota cycle. Missing setup is a neutral state; warnings are reserved for real failures or actionable thresholds. This system rejects false alarms, repeated decorative cards, and color-only status.",
+    "keyCharacteristics": [
+      "Compact, technical information hierarchy with familiar macOS controls.",
+      "Adaptive HUD vibrancy around flat, scan-friendly rows.",
+      "Explicit labels and text/icon state cues; semantic colors reinforce rather than replace meaning.",
+      "Distinct treatment for subscription totals, API spend, and plan quota."
+    ],
+    "rules": [
+      {
+        "name": "The Semantic Color Rule",
+        "body": "Missing credentials are neutral. Orange means a recoverable error; red means a high-severity threshold. Always pair color with readable text or an icon.",
+        "section": "colors"
+      },
+      {
+        "name": "The Adaptive Palette Rule",
+        "body": "Do not replace system appearance/accent colors with fixed dark-mode hex values. Let macOS choose the light/dark surface and user accent.",
+        "section": "colors"
+      },
+      {
+        "name": "The Scan-First Type Rule",
+        "body": "One glance should distinguish the number from its unit and period. Use monospaced digits for changing values and keep the label adjacent.",
+        "section": "typography"
+      },
+      {
+        "name": "The One-Glass-Surface Rule",
+        "body": "Keep vibrancy on the outer panel. Rows and progress indicators stay legible, compact, and mostly flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do label values as `plans / month`, `API spend / MTD`, or `quota used / reset`.",
+      "Do show a neutral “Not connected” state until a provider has credentials; reserve warnings for actual errors.",
+      "Do pair every semantic color with a label or icon.",
+      "Do use one glass panel, compact rows, system appearance, and native controls.",
+      "Do make quota thresholds actionable and announce them once when crossed.",
+      "Do keep preset price and renewal fields editable and user-confirmed."
+    ],
+    "donts": [
+      "Don't show a warning-colored error for a provider that is merely not configured.",
+      "Don't use oversized dashboards or repeated cards that make a menu-bar utility slow to scan.",
+      "Don't communicate status by color alone.",
+      "Don't combine recurring subscription cost, API spend, and plan-cycle quota into one ambiguous total.",
+      "Don't hard-code a dark palette or use repeated blur/shadow layers."
+    ]
+  }
+}
